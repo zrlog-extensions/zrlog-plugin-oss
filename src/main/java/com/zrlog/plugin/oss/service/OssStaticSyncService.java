@@ -15,8 +15,8 @@ import java.util.Map;
 @Service("oss.syncStaticResources")
 @ScheduledCapability(
         key = "oss.syncStaticResources",
-        label = "同步 OSS 静态资源",
-        description = "同步模板静态资源和静态缓存文件到阿里云 OSS。",
+        label = "同步阿里云存储静态资源",
+        description = "同步模板静态资源和静态缓存文件到阿里云存储。",
         defaultCron = "*/5 * * * *",
         timeoutSeconds = 300
 )
@@ -29,7 +29,7 @@ public class OssStaticSyncService implements IPluginService {
         try {
             new SyncTemplateStaticResourceRunnable(session).run();
             result.setSuccess(true);
-            data.put("message", "OSS static resources sync completed");
+            data.put("message", "阿里云存储静态资源已同步");
         } catch (Exception e) {
             result.setSuccess(false);
             result.setErrorMessage(e.getMessage());

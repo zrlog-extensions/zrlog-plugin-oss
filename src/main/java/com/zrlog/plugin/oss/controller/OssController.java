@@ -67,7 +67,7 @@ public class OssController {
     private Map<String, Object> provider() {
         Map<String, Object> provider = new HashMap<>();
         provider.put("key", "oss");
-        provider.put("title", "阿里云 OSS 对象存储设置");
+        provider.put("title", "阿里云存储设置");
         provider.put("helpUrl", "https://blog.zrlog.com/oss-install.html");
         provider.put("regionLabel", "Endpoint（地域节点）");
         provider.put("privateBucket", true);

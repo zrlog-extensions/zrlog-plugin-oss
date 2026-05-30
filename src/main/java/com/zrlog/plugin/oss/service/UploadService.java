@@ -28,8 +28,8 @@ import java.util.logging.Logger;
 @Capability(
         key = "oss.upload",
         type = "service",
-        label = "上传到阿里云 OSS",
-        description = "上传文章附件和生成资源到阿里云 OSS。",
+        label = "上传到阿里云存储",
+        description = "上传文章附件和生成资源到阿里云存储。",
         exposure = {"internal"},
         timeoutSeconds = 120
 )

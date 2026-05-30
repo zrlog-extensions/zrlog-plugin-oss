@@ -7,8 +7,8 @@ import com.zrlog.plugin.api.Service;
 @Capability(
         key = "oss.uploadPrivate",
         type = "service",
-        label = "上传到阿里云 OSS 私有存储",
-        description = "上传备份文件等私有资源到阿里云 OSS 私有存储桶。",
+        label = "上传到阿里云存储私有桶",
+        description = "上传备份文件等私有资源到阿里云存储私有桶。",
         exposure = {"internal"},
         timeoutSeconds = 120
 )
