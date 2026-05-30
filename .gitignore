@@ -15,3 +15,7 @@
 log/
 !.mvn/wrapper/maven-wrapper.jar
 oss.bgv
+node_modules/
+*.tsbuildinfo
+src/main/frontend/build
+src/main/resources/templates

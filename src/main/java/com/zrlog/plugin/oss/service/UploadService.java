@@ -5,6 +5,7 @@ import com.fzb.io.yunstore.AliyunBucketManageImpl;
 import com.fzb.io.yunstore.AliyunBucketVO;
 import com.google.gson.Gson;
 import com.zrlog.plugin.IOSession;
+import com.zrlog.plugin.api.Capability;
 import com.zrlog.plugin.api.IPluginService;
 import com.zrlog.plugin.api.Service;
 import com.zrlog.plugin.common.LoggerUtil;
@@ -13,6 +14,7 @@ import com.zrlog.plugin.common.response.UploadFileResponseEntry;
 import com.zrlog.plugin.data.codec.ContentType;
 import com.zrlog.plugin.data.codec.MsgPacket;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
+import com.zrlog.plugin.message.CapabilityInvokeResult;
 import com.zrlog.plugin.oss.entry.UploadFile;
 import com.zrlog.plugin.oss.timer.RefreshCdnWorker;
 import com.zrlog.plugin.type.ActionType;
@@ -23,15 +25,23 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Service("uploadService")
+@Capability(
+        key = "oss.upload",
+        type = "service",
+        label = "上传到阿里云 OSS",
+        description = "上传文章附件和生成资源到阿里云 OSS。",
+        exposure = {"internal"},
+        timeoutSeconds = 120
+)
 public class UploadService implements IPluginService {
 
     private static final Logger LOGGER = LoggerUtil.getLogger(UploadService.class);
 
     @Override
     public void handle(final IOSession ioSession, final MsgPacket requestPacket) {
-        Map<String, Object> request = new Gson().fromJson(requestPacket.getDataStr(), Map.class);
-        List<String> fileInfoList = (List<String>) request.get("fileInfo");
-        List<UploadFile> uploadFileList = getUploadFiles(fileInfoList);
+        Map<String, Object> rawRequest = new Gson().fromJson(requestPacket.getDataStr(), Map.class);
+        Map<String, Object> request = requestPayload(requestPacket, rawRequest);
+        List<UploadFile> uploadFileList = getUploadFiles(fileInfoList(request.get("fileInfo")));
         UploadFileResponse uploadFileResponse = upload(ioSession, uploadFileList);
         List<Map<String, Object>> responseList = new ArrayList<>();
         for (UploadFileResponseEntry entry : uploadFileResponse) {
@@ -39,11 +49,46 @@ public class UploadService implements IPluginService {
             map.put("url", entry.getUrl());
             responseList.add(map);
         }
-        ioSession.sendMsg(ContentType.JSON, responseList, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
+        if (Objects.equals(ActionType.CAPABILITY_INVOKE.name(), requestPacket.getMethodStr())) {
+            CapabilityInvokeResult result = new CapabilityInvokeResult();
+            result.setSuccess(true);
+            Map<String, Object> data = new HashMap<>();
+            data.put("items", responseList);
+            result.setData(data);
+            ioSession.sendJsonMsg(result, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
+        } else {
+            ioSession.sendMsg(ContentType.JSON, responseList, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
+        }
+    }
+
+    private Map<String, Object> requestPayload(MsgPacket requestPacket, Map<String, Object> rawRequest) {
+        if (rawRequest == null) {
+            return new HashMap<>();
+        }
+        Object payload = rawRequest.get("payload");
+        if (Objects.equals(ActionType.CAPABILITY_INVOKE.name(), requestPacket.getMethodStr()) && payload instanceof Map) {
+            return (Map<String, Object>) payload;
+        }
+        return rawRequest;
+    }
+
+    private List<String> fileInfoList(Object rawFileInfo) {
+        List<String> fileInfoList = new ArrayList<>();
+        if (rawFileInfo instanceof List) {
+            for (Object item : (List) rawFileInfo) {
+                if (item != null) {
+                    fileInfoList.add(item.toString());
+                }
+            }
+        }
+        return fileInfoList;
     }
 
     private static List<UploadFile> getUploadFiles(List<String> fileInfoList) {
         List<UploadFile> uploadFileList = new ArrayList<>();
+        if (fileInfoList == null) {
+            return uploadFileList;
+        }
         for (String fileInfo : fileInfoList) {
             UploadFile uploadFile = new UploadFile();
             String[] infos = fileInfo.split(",");

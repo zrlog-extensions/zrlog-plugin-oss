@@ -18,9 +18,12 @@ import java.util.Objects;
  */
 public class OssController {
 
+    private static final String CONFIG_KEYS = "access_key,host,secret_key,private_bucket,bucket,syncTemplate,appId,region,supportHttps,syncHtml";
+
     private final IOSession session;
     private final MsgPacket requestPacket;
     private final HttpRequestInfo requestInfo;
+    private final Gson gson = new Gson();
 
     public OssController(IOSession session, MsgPacket requestPacket, HttpRequestInfo requestInfo) {
         this.session = session;
@@ -37,25 +40,77 @@ public class OssController {
     }
 
     public void index() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("theme", isDarkMode() ? "dark" : "light");
+        data.put("data", gson.toJson(pageData()));
+        session.responseHtml("/templates/index", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
+    }
+
+    public void json() {
+        response(pageData());
+    }
+
+    public void info() {
+        response(loadConfig());
+    }
+
+    private Map<String, Object> pageData() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("dark", isDarkMode());
+        data.put("colorPrimary", getAdminColorPrimary());
+        data.put("plugin", session.getPlugin());
+        data.put("provider", provider());
+        data.put("config", loadConfig());
+        return successMap(data);
+    }
+
+    private Map<String, Object> provider() {
+        Map<String, Object> provider = new HashMap<>();
+        provider.put("key", "oss");
+        provider.put("title", "阿里云 OSS 对象存储设置");
+        provider.put("helpUrl", "https://blog.zrlog.com/oss-install.html");
+        provider.put("regionLabel", "Endpoint（地域节点）");
+        provider.put("privateBucket", true);
+        provider.put("appId", false);
+        provider.put("syncHtml", true);
+        provider.put("supportHttps", true);
+        return provider;
+    }
+
+    private Map<String, Object> loadConfig() {
         Map<String, Object> keyMap = new HashMap<>();
-        keyMap.put("key", "access_key,host,secret_key,private_bucket,bucket,syncTemplate,appId,region,supportHttps,syncHtml");
-        session.sendJsonMsg(keyMap, ActionType.GET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST, msgPacket -> {
-            Map map = new Gson().fromJson(msgPacket.getDataStr(), Map.class);
-            if(!Objects.equals(map.get("syncHtml"),"on")){
-                map.remove("syncHtml");
-            }
-            if(!Objects.equals(map.get("syncTemplate"),"on")){
-                map.remove("syncTemplate");
-            }
-            if(!Objects.equals(map.get("supportHttps"),"on")){
-                map.remove("supportHttps");
-            }
-            map.put("version", session.getPlugin().getVersion());
-            Map<String, Object> data = new HashMap<>();
-            data.put("data", new Gson().toJson(map));
-            data.put("version", session.getPlugin().getVersion());
-            data.put("theme", requestInfo.isDarkMode() ? "dark" : "light");
-            session.responseHtml("/templates/index.html", data, requestPacket.getMethodStr(), requestPacket.getMsgId());
-        });
+        keyMap.put("key", CONFIG_KEYS);
+        Map response = session.getResponseSync(ContentType.JSON, keyMap, ActionType.GET_WEBSITE, Map.class);
+        Map<String, Object> config = response == null ? new HashMap<>() : new HashMap<>(response);
+        normalizeSwitch(config, "syncHtml");
+        normalizeSwitch(config, "syncTemplate");
+        normalizeSwitch(config, "supportHttps");
+        config.put("version", session.getPlugin().getVersion());
+        return config;
+    }
+
+    private void normalizeSwitch(Map<String, Object> config, String key) {
+        if (!Objects.equals(config.get(key), "on")) {
+            config.put(key, "off");
+        }
+    }
+
+    private Map<String, Object> successMap(Object data) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("success", true);
+        map.put("data", data);
+        return map;
+    }
+
+    private void response(Map<String, Object> map) {
+        session.sendMsg(ContentType.JSON, map, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
+    }
+
+    private boolean isDarkMode() {
+        return requestInfo.isDarkMode();
+    }
+
+    private String getAdminColorPrimary() {
+        return requestInfo.getAdminColorPrimary();
     }
 }
