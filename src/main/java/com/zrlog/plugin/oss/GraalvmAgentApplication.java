@@ -1,5 +1,7 @@
 package com.zrlog.plugin.oss;
 
+import com.zrlog.plugin.RunConstants;
+import com.zrlog.plugin.type.RunType;
 import com.aliyun.oss.internal.Mimetypes;
 import com.aliyuncs.cdn.model.v20180510.RefreshObjectCachesResponse;
 import com.aliyuncs.cdn.model.v20180510fix.RefreshObjectCachesRequest;
@@ -19,6 +21,7 @@ public class GraalvmAgentApplication {
 
 
     public static void main(String[] args) throws IOException, InstantiationException, IllegalAccessException {
+        RunConstants.runType = RunType.AGENT;
         //upload need set content-type
         Mimetypes.getInstance();
         LogFactoryImpl.getLog(GraalvmAgentApplication.class).info("Common logging print");
