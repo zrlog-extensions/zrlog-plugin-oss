@@ -20,7 +20,7 @@ import java.util.Collections;
 public class GraalvmAgentApplication {
 
 
-    public static void main(String[] args) throws IOException, InstantiationException, IllegalAccessException {
+    public static void main(String[] args) throws IOException, ReflectiveOperationException {
         RunConstants.runType = RunType.AGENT;
         //upload need set content-type
         Mimetypes.getInstance();
@@ -28,8 +28,8 @@ public class GraalvmAgentApplication {
         PluginNativeImageUtils.usedGsonObject();
         PluginNativeImageUtils.gsonNativeAgentByClazz(Arrays.asList(RefreshObjectCachesResponse.class, RefreshObjectCachesRequest.class));
         new RefreshCdnWorker("test", "test", "oss-cn-chengdu.aliyuncs.com").start(Arrays.asList("https://blog.zrlog.com/?"));
-        UploadService.class.newInstance();
-        UploadToPrivateService.class.newInstance();
+        UploadService.class.getDeclaredConstructor().newInstance();
+        UploadToPrivateService.class.getDeclaredConstructor().newInstance();
         String basePath = System.getProperty("user.dir").replace("\\target", "").replace("/target", "");
         //PathKit.setRootPath(basePath);
         File file = new File(basePath + "/src/main/resources");
