@@ -232,6 +232,7 @@
                                     -H:+BuildReport
                                     -H:+AddAllCharsets
                                     -H:+UnlockExperimentalVMOptions
+                                    -H:-ReduceImplicitExceptionStackTraceInformation
                                     --initialize-at-build-time=org.apache.commons.logging.LogFactory
                                     --initialize-at-build-time=org.apache.commons.logging.impl.LogFactoryImpl
                                     --initialize-at-build-time=com.aliyun.oss.internal.OSSUtils
