@@ -40,49 +40,31 @@ public class UploadService implements IPluginService {
 
     @Override
     public void handle(final IOSession ioSession, final MsgPacket requestPacket) {
-        Map<String, Object> rawRequest = new Gson().fromJson(requestPacket.getDataStr(), Map.class);
-        Map<String, Object> request = requestPayload(requestPacket, rawRequest);
-        List<UploadFile> uploadFileList = getUploadFiles(fileInfoList(request.get("fileInfo")));
+        UploadServiceRequest rawRequest = new Gson().fromJson(requestPacket.getDataStr(), UploadServiceRequest.class);
+        UploadServiceRequest request = requestPayload(requestPacket, rawRequest);
+        List<UploadFile> uploadFileList = getUploadFiles(request.fileInfoList());
         UploadFileResponse uploadFileResponse = upload(ioSession, uploadFileList);
-        List<Map<String, Object>> responseList = new ArrayList<>();
-        for (UploadFileResponseEntry entry : uploadFileResponse) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("url", entry.getUrl());
-            responseList.add(map);
-        }
         if (Objects.equals(ActionType.CAPABILITY_INVOKE.name(), requestPacket.getMethodStr())) {
             CapabilityInvokeResult result = new CapabilityInvokeResult();
             result.setSuccess(true);
             Map<String, Object> data = new HashMap<>();
-            data.put("items", responseList);
+            data.put("items", uploadFileResponse);
             result.setData(data);
             ioSession.sendJsonMsg(result, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
         } else {
-            ioSession.sendMsg(ContentType.JSON, responseList, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
+            ioSession.sendMsg(ContentType.JSON, uploadFileResponse, requestPacket.getMethodStr(), requestPacket.getMsgId(), MsgPacketStatus.RESPONSE_SUCCESS);
         }
     }
 
-    private Map<String, Object> requestPayload(MsgPacket requestPacket, Map<String, Object> rawRequest) {
+    private UploadServiceRequest requestPayload(MsgPacket requestPacket, UploadServiceRequest rawRequest) {
         if (rawRequest == null) {
-            return new HashMap<>();
+            return new UploadServiceRequest();
         }
-        Object payload = rawRequest.get("payload");
-        if (Objects.equals(ActionType.CAPABILITY_INVOKE.name(), requestPacket.getMethodStr()) && payload instanceof Map) {
-            return (Map<String, Object>) payload;
+        if (Objects.equals(ActionType.CAPABILITY_INVOKE.name(), requestPacket.getMethodStr())
+                && rawRequest.getPayload() != null) {
+            return rawRequest.getPayload();
         }
         return rawRequest;
-    }
-
-    private List<String> fileInfoList(Object rawFileInfo) {
-        List<String> fileInfoList = new ArrayList<>();
-        if (rawFileInfo instanceof List) {
-            for (Object item : (List) rawFileInfo) {
-                if (item != null) {
-                    fileInfoList.add(item.toString());
-                }
-            }
-        }
-        return fileInfoList;
     }
 
     private static List<UploadFile> getUploadFiles(List<String> fileInfoList) {
@@ -117,10 +99,10 @@ public class UploadService implements IPluginService {
         final Map<String, Object> keyMap = new HashMap<>();
         String bucketKeyName = getBucketKeyName();
         keyMap.put("key", "access_key,secret_key,host,region,supportHttps," + bucketKeyName);
-        Map<String, String> responseMap = session.getResponseSync(ContentType.JSON, keyMap, ActionType.GET_WEBSITE, Map.class);
-        AliyunBucketVO bucket = new AliyunBucketVO(responseMap.get(bucketKeyName), responseMap.get("access_key"),
-                responseMap.get("secret_key"), responseMap.get("host"),
-                responseMap.get("region"));
+        OssStorageConfig config = session.getResponseSync(ContentType.JSON, keyMap, ActionType.GET_WEBSITE, OssStorageConfig.class);
+        AliyunBucketVO bucket = new AliyunBucketVO(config.bucketName(bucketKeyName), config.getAccessKey(),
+                config.getSecretKey(), config.getHost(),
+                config.getRegion());
         if (Objects.isNull(bucket.getBucketName()) || bucket.getBucketName().isEmpty()) {
             LOGGER.warning("missing config " + bucketKeyName);
             for (UploadFile uploadFile : uploadFileList) {
@@ -135,8 +117,7 @@ public class UploadService implements IPluginService {
             for (UploadFile uploadFile : uploadFileList) {
                 UploadFileResponseEntry entry = new UploadFileResponseEntry();
                 try {
-                    boolean supportHttps = responseMap.get("supportHttps") != null && "on".equalsIgnoreCase(responseMap.get("supportHttps"));
-                    entry.setUrl(man.create(uploadFile.getFile(), uploadFile.getFileKey(), true, supportHttps));
+                    entry.setUrl(man.create(uploadFile.getFile(), uploadFile.getFileKey(), true, config.isSupportHttpsEnabled()));
                     if (Objects.equals(uploadFile.getRefresh(), true)) {
                         refreshCacheUrls.add(entry.getUrl());
                         //首页的情况，需要额外，更新下不带目录的
@@ -154,7 +135,7 @@ public class UploadService implements IPluginService {
             if (refreshCacheUrls.isEmpty()) {
                 return response;
             }
-            try (RefreshCdnWorker refreshCdnWorker = new RefreshCdnWorker(responseMap.get("access_key"), responseMap.get("secret_key"), responseMap.get("region"))) {
+            try (RefreshCdnWorker refreshCdnWorker = new RefreshCdnWorker(config.getAccessKey(), config.getSecretKey(), config.getRegion())) {
                 refreshCdnWorker.start(refreshCacheUrls);
                 return response;
             }

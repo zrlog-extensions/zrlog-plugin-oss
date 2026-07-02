@@ -1,6 +1,8 @@
 package com.zrlog.plugin.oss.timer;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.zrlog.plugin.IOSession;
 import com.zrlog.plugin.common.IdUtil;
 import com.zrlog.plugin.common.LoggerUtil;
@@ -11,6 +13,7 @@ import com.zrlog.plugin.data.codec.ContentType;
 import com.zrlog.plugin.data.codec.MsgPacketStatus;
 import com.zrlog.plugin.oss.FileUtils;
 import com.zrlog.plugin.oss.entry.UploadFile;
+import com.zrlog.plugin.oss.service.OssStorageConfig;
 import com.zrlog.plugin.oss.service.UploadService;
 import com.zrlog.plugin.type.ActionType;
 
@@ -28,7 +31,7 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
 
     private final IOSession session;
 
-    private final Map<String, Object> fileInfoCacheMap = new TreeMap<>();
+    private final Map<String, String> fileInfoCacheMap = new TreeMap<>();
     private final String cacheKeyMapKey = "cacheMap";
     private final ReentrantLock reentrantLock = new ReentrantLock();
 
@@ -36,8 +39,8 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
         this.session = session;
     }
 
-    private List<UploadFile> cacheFiles(BlogRunTime blogRunTime, Map<String, String> responseMap) {
-        if (!"on".equals(responseMap.get("syncHtml"))) {
+    private List<UploadFile> cacheFiles(BlogRunTime blogRunTime, OssStorageConfig syncConfig) {
+        if (!syncConfig.isSyncHtmlEnabled()) {
             return new ArrayList<>();
         }
         String cacheFolder = new File(blogRunTime.getPath()).getParent() + "/cache/zh_CN";
@@ -50,8 +53,8 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
         return uploadFiles;
     }
 
-    private List<UploadFile> templateUploadFiles(BlogRunTime blogRunTime, Map<String, String> responseMap, TemplatePath templatePath) {
-        if (!"on".equals(responseMap.get("syncTemplate"))) {
+    private List<UploadFile> templateUploadFiles(BlogRunTime blogRunTime, OssStorageConfig syncConfig, TemplatePath templatePath) {
+        if (!syncConfig.isSyncTemplateEnabled()) {
             return new ArrayList<>();
         }
         File templateFilePath = new File(blogRunTime.getPath() + templatePath.getValue());
@@ -81,17 +84,33 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
         return uploadFiles;
     }
 
-    private void preloadCache(Map<String, String> responseMap) {
-        String cacheMapStr = responseMap.get(cacheKeyMapKey);
+    private void preloadCache(OssStorageConfig syncConfig) {
+        String cacheMapStr = syncConfig.getCacheMap();
         if (Objects.nonNull(cacheMapStr) && !cacheMapStr.isEmpty()) {
-            fileInfoCacheMap.putAll(new Gson().fromJson(cacheMapStr, Map.class));
+            fileInfoCacheMap.putAll(parseCacheMap(cacheMapStr));
         }
     }
 
+    private Map<String, String> parseCacheMap(String cacheMapStr) {
+        JsonObject jsonObject = new Gson().fromJson(cacheMapStr, JsonObject.class);
+        Map<String, String> cacheMap = new TreeMap<>();
+        if (jsonObject == null) {
+            return cacheMap;
+        }
+        for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
+            JsonElement value = entry.getValue();
+            if (value == null || value.isJsonNull()) {
+                continue;
+            }
+            cacheMap.put(entry.getKey(), value.isJsonPrimitive() ? value.getAsString() : value.toString());
+        }
+        return cacheMap;
+    }
+
     private void saveCacheToDb() {
-        Map<String, String> newCacheMap = new TreeMap<>();
-        newCacheMap.put(cacheKeyMapKey, new Gson().toJson(fileInfoCacheMap));
-        session.sendJsonMsg(newCacheMap, ActionType.SET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST);
+        OssStorageConfig syncConfig = new OssStorageConfig();
+        syncConfig.setCacheMap(new Gson().toJson(fileInfoCacheMap));
+        session.sendJsonMsg(syncConfig, ActionType.SET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST);
     }
 
     @Override
@@ -100,14 +119,17 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
         try {
             Map<String, Object> map = new HashMap<>();
             map.put("key", "syncTemplate,syncHtml," + cacheKeyMapKey);
-            Map<String, String> responseMap = (Map<String, String>) session.getResponseSync(ContentType.JSON, map, ActionType.GET_WEBSITE, Map.class);
+            OssStorageConfig syncConfig = session.getResponseSync(ContentType.JSON, map, ActionType.GET_WEBSITE, OssStorageConfig.class);
+            if (syncConfig == null) {
+                return;
+            }
             //reload cache
-            preloadCache(responseMap);
+            preloadCache(syncConfig);
             TemplatePath templatePath = session.getResponseSync(ContentType.JSON, new HashMap<>(), ActionType.CURRENT_TEMPLATE, TemplatePath.class);
             BlogRunTime blogRunTime = session.getResponseSync(ContentType.JSON, new HashMap<>(), ActionType.BLOG_RUN_TIME, BlogRunTime.class);
             List<UploadFile> uploadFiles = new ArrayList<>();
-            uploadFiles.addAll(templateUploadFiles(blogRunTime, responseMap, templatePath));
-            uploadFiles.addAll(cacheFiles(blogRunTime, responseMap));
+            uploadFiles.addAll(templateUploadFiles(blogRunTime, syncConfig, templatePath));
+            uploadFiles.addAll(cacheFiles(blogRunTime, syncConfig));
             if (uploadFiles.isEmpty()) {
                 return;
             }

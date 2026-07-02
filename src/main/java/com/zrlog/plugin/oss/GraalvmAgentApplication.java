@@ -7,7 +7,13 @@ import com.aliyuncs.cdn.model.v20180510.RefreshObjectCachesResponse;
 import com.aliyuncs.cdn.model.v20180510fix.RefreshObjectCachesRequest;
 import com.zrlog.plugin.common.PluginNativeImageUtils;
 import com.zrlog.plugin.oss.controller.OssController;
+import com.zrlog.plugin.oss.controller.StorageApiResponse;
+import com.zrlog.plugin.oss.controller.StorageInfoResponse;
+import com.zrlog.plugin.oss.controller.StorageProvider;
+import com.zrlog.plugin.oss.controller.WebsiteKeyRequest;
+import com.zrlog.plugin.oss.service.OssStorageConfig;
 import com.zrlog.plugin.oss.service.UploadService;
+import com.zrlog.plugin.oss.service.UploadServiceRequest;
 import com.zrlog.plugin.oss.service.UploadToPrivateService;
 import com.zrlog.plugin.oss.timer.RefreshCdnWorker;
 import org.apache.commons.logging.impl.LogFactoryImpl;
@@ -26,7 +32,9 @@ public class GraalvmAgentApplication {
         Mimetypes.getInstance();
         LogFactoryImpl.getLog(GraalvmAgentApplication.class).info("Common logging print");
         PluginNativeImageUtils.usedGsonObject();
-        PluginNativeImageUtils.gsonNativeAgentByClazz(Arrays.asList(RefreshObjectCachesResponse.class, RefreshObjectCachesRequest.class));
+        PluginNativeImageUtils.gsonNativeAgentByClazz(Arrays.asList(RefreshObjectCachesResponse.class, RefreshObjectCachesRequest.class,
+                UploadServiceRequest.class, OssStorageConfig.class, StorageApiResponse.class, StorageInfoResponse.class,
+                StorageProvider.class, WebsiteKeyRequest.class));
         new RefreshCdnWorker("test", "test", "oss-cn-chengdu.aliyuncs.com").start(Arrays.asList("https://blog.zrlog.com/?"));
         UploadService.class.getDeclaredConstructor().newInstance();
         UploadToPrivateService.class.getDeclaredConstructor().newInstance();
