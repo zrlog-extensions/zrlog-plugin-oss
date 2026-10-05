@@ -248,16 +248,15 @@
                                     -H:+AddAllCharsets
                                     -H:+UnlockExperimentalVMOptions
                                     -H:-ReduceImplicitExceptionStackTraceInformation
-                                    --initialize-at-build-time=org.apache.commons.logging.LogFactory
-                                    --initialize-at-build-time=org.apache.commons.logging.impl.LogFactoryImpl
-                                    --initialize-at-build-time=com.aliyun.oss.internal.OSSUtils
-                                    --initialize-at-build-time=com.aliyun.oss.ClientBuilderConfiguration
+                                    --initialize-at-run-time=org.apache.commons.logging.LogFactory
+                                    --initialize-at-run-time=org.apache.commons.logging.impl.LogFactoryImpl
+                                    --initialize-at-run-time=com.aliyun.oss.internal.OSSUtils
+                                    --initialize-at-run-time=com.aliyun.oss.ClientBuilderConfiguration
                                     --initialize-at-build-time=sun.security.krb5.SCDynamicStoreConfig
                                     --initialize-at-build-time=java.util.ImmutableCollections$ListN
-                                    --trace-class-initialization=sun.security.krb5.SCDynamicStoreConfig
                                     -H:+UnlockExperimentalVMOptions
-                                    -march=compatibility --enable-preview -H:DashboardDump=${imageName}
-                                    -H:+DashboardAll -H:IncludeResources= --enable-url-protocols=http --enable-url-protocols=https --enable-monitoring=heapdump
+                                    -march=compatibility --enable-preview
+                                    -H:IncludeResources= --enable-url-protocols=http --enable-url-protocols=https --enable-monitoring=heapdump
                                 </arg>
                             </buildArgs>
                             <mainClass>${native.image.mainClass}</mainClass>
