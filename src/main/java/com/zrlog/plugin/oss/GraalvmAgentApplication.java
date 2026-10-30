@@ -36,6 +36,8 @@ public class GraalvmAgentApplication {
                 UploadServiceRequest.class, OssStorageConfig.class, StorageApiResponse.class, StorageInfoResponse.class,
                 StorageProvider.class, WebsiteKeyRequest.class));
         new RefreshCdnWorker("test", "test", "oss-cn-chengdu.aliyuncs.com").start(Arrays.asList("https://blog.zrlog.com/?"));
+        com.zrlog.plugin.oss.service.OssRefreshCacheService.class.getDeclaredConstructor().newInstance();
+        com.zrlog.plugin.oss.service.OssStaticSyncService.class.getDeclaredConstructor().newInstance();
         UploadService.class.getDeclaredConstructor().newInstance();
         UploadToPrivateService.class.getDeclaredConstructor().newInstance();
         String basePath = System.getProperty("user.dir").replace("\\target", "").replace("/target", "");

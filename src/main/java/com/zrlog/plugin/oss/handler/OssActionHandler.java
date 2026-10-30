@@ -9,6 +9,10 @@ import java.util.Objects;
 
 public class OssActionHandler extends ClientActionHandler {
 
+    /** Services wait for their owned work; legacy HTTP callbacks do not declare completed view rendering. */
+    @Override
+    public int capabilityLifecycleVersion() { return 1; }
+
     private final ConnectHandler connectHandler;
 
     public OssActionHandler(ConnectHandler connectHandler) {
