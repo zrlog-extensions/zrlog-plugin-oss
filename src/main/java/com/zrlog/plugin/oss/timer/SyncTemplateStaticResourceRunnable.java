@@ -4,13 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.zrlog.plugin.IOSession;
-import com.zrlog.plugin.common.IdUtil;
 import com.zrlog.plugin.common.LoggerUtil;
 import com.zrlog.plugin.common.SecurityUtils;
 import com.zrlog.plugin.common.model.BlogRunTime;
 import com.zrlog.plugin.common.model.TemplatePath;
 import com.zrlog.plugin.data.codec.ContentType;
-import com.zrlog.plugin.data.codec.MsgPacketStatus;
 import com.zrlog.plugin.oss.FileUtils;
 import com.zrlog.plugin.oss.entry.UploadFile;
 import com.zrlog.plugin.oss.service.OssStorageConfig;
@@ -110,7 +108,7 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
     private void saveCacheToDb() {
         OssStorageConfig syncConfig = new OssStorageConfig();
         syncConfig.setCacheMap(new Gson().toJson(fileInfoCacheMap));
-        session.sendJsonMsg(syncConfig, ActionType.SET_WEBSITE.name(), IdUtil.getInt(), MsgPacketStatus.SEND_REQUEST);
+        session.getResponseSync(ContentType.JSON, syncConfig, ActionType.SET_WEBSITE, Object.class);
     }
 
     @Override
@@ -121,7 +119,7 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
             map.put("key", "syncTemplate,syncHtml," + cacheKeyMapKey);
             OssStorageConfig syncConfig = session.getResponseSync(ContentType.JSON, map, ActionType.GET_WEBSITE, OssStorageConfig.class);
             if (syncConfig == null) {
-                return;
+                throw new IllegalStateException("Unable to read OSS sync configuration");
             }
             //reload cache
             preloadCache(syncConfig);
@@ -133,10 +131,10 @@ public class SyncTemplateStaticResourceRunnable implements Runnable {
             if (uploadFiles.isEmpty()) {
                 return;
             }
-            new UploadService().upload(session, uploadFiles);
+            new UploadService().uploadStrict(session, uploadFiles);
             saveCacheToDb();
         } catch (Exception e) {
-            LOGGER.warning("Sync error " + e.getMessage());
+            throw new IllegalStateException("OSS sync failed", e);
         } finally {
             reentrantLock.unlock();
         }

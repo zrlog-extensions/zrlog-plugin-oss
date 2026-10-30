@@ -91,6 +91,14 @@ public class UploadService implements IPluginService {
     }
 
     public UploadFileResponse upload(IOSession session, final List<UploadFile> uploadFileList) {
+        return upload(session, uploadFileList, false);
+    }
+
+    public UploadFileResponse uploadStrict(IOSession session, List<UploadFile> uploadFileList) {
+        return upload(session, uploadFileList, true);
+    }
+
+    private UploadFileResponse upload(IOSession session, List<UploadFile> uploadFileList, boolean strict) {
         final UploadFileResponse response = new UploadFileResponse();
         long startTime = System.currentTimeMillis();
         if (uploadFileList == null || uploadFileList.isEmpty()) {
@@ -104,6 +112,7 @@ public class UploadService implements IPluginService {
                 config.getSecretKey(), config.getHost(),
                 config.getRegion());
         if (Objects.isNull(bucket.getBucketName()) || bucket.getBucketName().isEmpty()) {
+            if (strict) throw new IllegalStateException("Missing OSS bucket configuration");
             LOGGER.warning("missing config " + bucketKeyName);
             for (UploadFile uploadFile : uploadFileList) {
                 UploadFileResponseEntry entry = new UploadFileResponseEntry();
@@ -126,6 +135,7 @@ public class UploadService implements IPluginService {
                         }
                     }
                 } catch (Exception e) {
+                    if (strict) throw new IllegalStateException("OSS upload failed", e);
                     LOGGER.log(Level.SEVERE, "upload error " + e.getMessage());
                     entry.setUrl(uploadFile.getFileKey());
                 }
@@ -140,6 +150,7 @@ public class UploadService implements IPluginService {
                 return response;
             }
         } catch (Exception e) {
+            if (strict) throw new IllegalStateException("OSS upload failed", e);
             LOGGER.log(Level.SEVERE, "upload error " + e.getMessage());
         }
         return response;
